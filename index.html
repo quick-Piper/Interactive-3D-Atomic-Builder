@@ -515,14 +515,14 @@ function rebuildAtom(){
   neutronMat.emissive.setHex(glow);
 
   // NEW: Update forcefield color based on stability
-  //if (stabilityClass === 'stable') {
-  //  forcefieldMaterial.uniforms.glowColor.value.setHex(0x46D18C); // Green
-  //} else if (stabilityClass === 'unstable') {
-  //  forcefieldMaterial.uniforms.glowColor.value.setHex(0xF5A94E); // Yellow
-  //} else if (stabilityClass === 'radioactive') {
-  //  forcefieldMaterial.uniforms.glowColor.value.setHex(0xFF5D5D); // Red
-  //}
-//}
+  if (stabilityClass === 'stable') {
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0x46D18C); // Green
+  } else if (stabilityClass === 'unstable') {
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0xF5A94E); // Yellow
+  } else if (stabilityClass === 'radioactive') {
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0xFF5D5D); // Red
+  }
+}
 
 // ---------------------------------------------------------------
 // Animation loop
