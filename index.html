@@ -107,8 +107,8 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="eyebrow">Interactive · Bohr Model</div>
-  <h1>Atomic Builder — 3D</h1>
+  <div class="eyebrow">Atomicca</div>
+  <h1>Atomic Builder</h1>
   <p class="sub">Drag to orbit, scroll to zoom. Change the proton count to jump elements — neutrons and electrons update to the most common isotope automatically, but you can override either one to build ions and isotopes.</p>
 
   <div class="jump-row">
@@ -352,7 +352,7 @@ document.getElementById('resetCam').addEventListener('click', () => {
 // --- Nucleus ---
 const protonMat = new THREE.MeshStandardMaterial({ color:0xFF5D5D, emissive:0x220000, roughness:0.35, metalness:0.1 });
 const neutronMat = new THREE.MeshStandardMaterial({ color:0x9AA3B2, emissive:0x0a0a0d, roughness:0.4, metalness:0.1 });
-const nucleonGeo = new THREE.IcosahedronGeometry(0.16, 1);
+const nucleonGeo = new THREE.IcosahedronGeometry(0.16, 3);
 let protonMesh = null, neutronMesh = null;
 let nucleusRadius = 1;
 
@@ -407,7 +407,7 @@ function rebuildNucleus(){
 }
 
 // --- Electron shells ---
-const electronGeo = new THREE.SphereGeometry(0.1, 16, 16);
+const electronGeo = new THREE.SphereGeometry(0.1, 32, 32);
 const electronMat = new THREE.MeshStandardMaterial({ color:0x4CC9F0, emissive:0x0a3a4a, roughness:0.2, metalness:0.2 });
 const shellRingMat = new THREE.LineBasicMaterial({ color:0x2a3342, transparent:true, opacity:0.5 });
 let electronMeshes = []; // {mesh, base:Vector3, axis:Vector3, speed, phase}
@@ -441,11 +441,11 @@ function rebuildElectrons(){
     const countInShell = Math.min(cap, remaining);
     const rad = shellRadius(shellIndex+1);
 
-    const ring = buildShellRing(rad);
-    ring.rotation.x = (shellIndex % 2) * 0.35;
-    ring.rotation.z = (shellIndex % 3) * 0.4;
-    scene.add(ring);
-    shellRings.push(ring);
+    // const ring = buildShellRing(rad);
+    // ring.rotation.x = (shellIndex % 2) * 0.35;
+    // ring.rotation.z = (shellIndex % 3) * 0.4;
+    // scene.add(ring);
+    // shellRings.push(ring);
 
     for(let i=0;i<countInShell;i++){
       const y = countInShell > 1 ? 1 - (i/(countInShell-1))*2 : 0;
