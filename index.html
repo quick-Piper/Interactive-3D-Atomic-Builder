@@ -438,7 +438,7 @@ function rebuildNucleus(){
   neutronMesh.instanceMatrix.needsUpdate = true;
   scene.add(protonMesh, neutronMesh);
   // Add the forcefield sphere, scaled slightly larger than the nucleus
-  const boundsGeo = new THREE.SphereGeometry(nucleusRadius + 0.35, 32, 32);
+  const boundsGeo = new THREE.SphereGeometry(nucleusRadius + 0.35, 64, 64);
   nucleusBoundsMesh = new THREE.Mesh(boundsGeo, forcefieldMaterial);
   scene.add(nucleusBoundsMesh);
 }
