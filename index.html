@@ -12,9 +12,9 @@
     --border: #1E2530;
     --text: #E7ECF3;
     --muted: #6B7684;
-    --proton: #FF5D5D;
+    --proton: #4CC9F0;    /* Now Blue */
     --neutron: #9AA3B2;
-    --electron: #4CC9F0;
+    --electron: #FF5D5D;  /* Now Red */
     --stable: #46D18C;
     --unstable: #F5A94E;
     --radioactive: #FF5D5D;
@@ -240,19 +240,37 @@ function updateInfoCard(){
   const [sym,name] = ELEMENTS[protons];
   const mass = protons + neutrons;
   const charge = protons - electrons;
-  infoElement.textContent = `${name} (${sym})`;
+
+  // 1. Hydrogen Exception Logic
+  let displayName = `${name} (${sym})`;
+  if (protons === 1) {
+    if (neutrons === 0) displayName = `Protium (${sym}-1)`;
+    else if (neutrons === 1) displayName = `Deuterium (${sym}-2)`;
+    else if (neutrons === 2) displayName = `Tritium (${sym}-3)`;
+  }
+  infoElement.textContent = displayName;
+
   infoMass.textContent = mass;
   infoCharge.textContent = charge === 0 ? 'Neutral Atom' : (charge > 0 ? `Cation (+${charge})` : `Anion (${charge})`);
 
+  // 2. Stability Logic (including Tritium)
   let stabilityText, stabilityClass;
-  if(protons >= 84 || NO_STABLE.has(protons)){
+  if (protons >= 84 || NO_STABLE.has(protons)) {
     stabilityText = 'Radioactive Element';
+    stabilityClass = 'radioactive';
+  } else if (protons === 1 && neutrons === 2) {
+    stabilityText = 'Radioactive Isotope'; // Tritium catch
     stabilityClass = 'radioactive';
   } else {
     const expected = defaultNeutrons(protons);
     const diff = Math.abs(neutrons - expected);
-    if(diff <= 2){ stabilityText = `Stable Isotope (${sym}-${mass})`; stabilityClass = 'stable'; }
-    else { stabilityText = `Unstable Isotope (${sym}-${mass})`; stabilityClass = 'unstable'; }
+    if (diff <= 2) { 
+      stabilityText = `Stable Isotope (${sym}-${mass})`; 
+      stabilityClass = 'stable'; 
+    } else { 
+      stabilityText = `Unstable Isotope (${sym}-${mass})`; 
+      stabilityClass = 'unstable'; 
+    }
   }
   infoStability.textContent = stabilityText;
   infoStability.className = 'info-value ' + stabilityClass;
@@ -394,7 +412,8 @@ document.getElementById('resetCam').addEventListener('click', () => {
 });
 
 // --- Nucleus ---
-const protonMat = new THREE.MeshStandardMaterial({ color:0xFF5D5D, emissive:0x220000, roughness:0.35, metalness:0.1 });
+// Protons are now Blue
+const protonMat = new THREE.MeshStandardMaterial({ color:0x4CC9F0, emissive:0x001133, roughness:0.35, metalness:0.1 });
 const neutronMat = new THREE.MeshStandardMaterial({ color:0x9AA3B2, emissive:0x0a0a0d, roughness:0.4, metalness:0.1 });
 const nucleonGeo = new THREE.IcosahedronGeometry(0.16, 3);
 let protonMesh = null, neutronMesh = null;
@@ -489,7 +508,8 @@ function rebuildNucleus(){
 
 // --- Electron shells ---
 const electronGeo = new THREE.SphereGeometry(0.1, 32, 32);
-const electronMat = new THREE.MeshStandardMaterial({ color:0x4CC9F0, emissive:0x0a3a4a, roughness:0.2, metalness:0.2 });
+// Electrons are now Red
+const electronMat = new THREE.MeshStandardMaterial({ color:0xFF5D5D, emissive:0x3a0a0a, roughness:0.2, metalness:0.2 });
 const shellRingMat = new THREE.LineBasicMaterial({ color:0x2a3342, transparent:true, opacity:0.5 });
 let electronMeshes = []; // {mesh, base:Vector3, axis:Vector3, speed, phase}
 let shellRings = [];
