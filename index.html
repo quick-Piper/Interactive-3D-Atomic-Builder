@@ -63,12 +63,18 @@
   }
   .resetBtn:hover{ background:rgba(255,255,255,0.12); }
   .legend{
-    position:absolute; bottom:12px; right:14px; display:flex; gap:14px;
+    position:absolute; bottom:12px; right:14px; display:flex; gap:20px;
     font-size:11px; color:var(--muted); font-family:var(--font-data);
   }
   .legend span{ display:inline-flex; align-items:center; gap:5px; }
   .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
   .dot.p{ background:var(--proton); } .dot.n{ background:var(--neutron); } .dot.e{ background:var(--electron); }
+
+  /* Mobile Optimization */
+  @media (max-width: 600px) {
+    .hint { display: none; }
+    .legend { left: 14px; justify-content: space-between; gap: unset; }
+  }
 
   .info-card{
     display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
