@@ -199,7 +199,7 @@ const ELEMENTS = [null,
 ["Ts","Tennessine",294],["Og","Oganesson",294]
 ];
 const NO_STABLE = new Set([43,61]); // Tc, Pm
-const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const REDUCED_MOTION = false; // Override system settings so animations always play
 const SHELL_CAPACITY = [2,8,18,32,32,18,8]; // sums to 118
 
 function defaultNeutrons(z){
