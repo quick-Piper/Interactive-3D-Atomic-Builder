@@ -359,9 +359,9 @@ let nucleusRadius = 1;
 // --- Dynamic Forcefield Shader ---
 const forcefieldMaterial = new THREE.ShaderMaterial({
   uniforms: {
-    glowColor: { value: new THREE.Color(0x46D18C) }, // Defaults to green
-    c: { value: 0.15 }, // Controls the thickness of the edge glow
-    p: { value: 2.5 }   // Controls the sharpness of the fade
+    glowColor: { value: new THREE.Color(0x46D18C) }, 
+    c: { value: 1.2 }, // Intensity multiplier (brightness)
+    p: { value: 3.0 }  // Falloff sharpness (how quickly it fades to the center)
   },
   vertexShader: `
     varying vec3 vNormal;
@@ -376,9 +376,9 @@ const forcefieldMaterial = new THREE.ShaderMaterial({
     uniform float p;
     varying vec3 vNormal;
     void main() {
-      // Calculate fresnel effect based on camera angle
-      float intensity = pow(c - dot(vNormal, vec3(0.0, 0.0, 1.0)), p);
-      gl_FragColor = vec4(glowColor, intensity * 1.5);
+      // 1.0 minus the dot product ensures the edge is 1 and center is 0
+      float intensity = pow(1.0 - max(dot(vNormal, vec3(0.0, 0.0, 1.0)), 0.0), p) * c;
+      gl_FragColor = vec4(glowColor, intensity);
     }
   `,
   side: THREE.FrontSide,
