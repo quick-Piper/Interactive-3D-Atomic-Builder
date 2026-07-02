@@ -108,7 +108,7 @@
 <body>
 <div class="wrap">
   <div class="eyebrow">Atomicca</div>
-  <h1>Atomic Builder</h1>
+  <h1>Interactive 3D Atomic Builder</h1>
   <p class="sub">Drag to orbit, scroll to zoom. Change the proton count to jump elements — neutrons and electrons update to the most common isotope automatically, but you can override either one to build ions and isotopes.</p>
 
   <div class="jump-row">
@@ -356,6 +356,17 @@ const nucleonGeo = new THREE.IcosahedronGeometry(0.16, 3);
 let protonMesh = null, neutronMesh = null;
 let nucleusRadius = 1;
 
+// --- Nucleus Boundary Sphere ---
+const boundsMat = new THREE.MeshStandardMaterial({ 
+  color: 0xffffff, 
+  transparent: true, 
+  opacity: 0.08, 
+  roughness: 0.1, 
+  metalness: 0.5, 
+  depthWrite: false 
+});
+let nucleusBoundsMesh = null;  
+  
 function packSphere(n, containerRadius){
   // Simple rejection-sampled packing so nucleons don't overlap.
   const pts = [];
@@ -385,6 +396,7 @@ function packSphere(n, containerRadius){
 function rebuildNucleus(){
   if(protonMesh){ scene.remove(protonMesh); protonMesh.geometry.dispose(); }
   if(neutronMesh){ scene.remove(neutronMesh); neutronMesh.geometry.dispose(); }
+  if(nucleusBoundsMesh){ scene.remove(nucleusBoundsMesh); nucleusBoundsMesh.geometry.dispose(); }
 
   const A = protons + neutrons;
   nucleusRadius = 0.42 + 0.16 * Math.cbrt(Math.max(A,1));
@@ -404,6 +416,10 @@ function rebuildNucleus(){
   protonMesh.instanceMatrix.needsUpdate = true;
   neutronMesh.instanceMatrix.needsUpdate = true;
   scene.add(protonMesh, neutronMesh);
+  // Add the bounding sphere slightly larger than the calculated nucleus radius
+  const boundsGeo = new THREE.SphereGeometry(nucleusRadius + 0.2, 32, 32);
+  nucleusBoundsMesh = new THREE.Mesh(boundsGeo, boundsMat);
+  scene.add(nucleusBoundsMesh);
 }
 
 // --- Electron shells ---
