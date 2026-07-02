@@ -356,16 +356,37 @@ const nucleonGeo = new THREE.IcosahedronGeometry(0.16, 3);
 let protonMesh = null, neutronMesh = null;
 let nucleusRadius = 1;
 
-// --- Nucleus Boundary Sphere ---
-const boundsMat = new THREE.MeshStandardMaterial({ 
-  color: 0xffffff, 
-  transparent: true, 
-  opacity: 0.08, 
-  roughness: 0.1, 
-  metalness: 0.5, 
-  depthWrite: false 
+// --- Dynamic Forcefield Shader ---
+const forcefieldMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    glowColor: { value: new THREE.Color(0x46D18C) }, // Defaults to green
+    c: { value: 0.15 }, // Controls the thickness of the edge glow
+    p: { value: 2.5 }   // Controls the sharpness of the fade
+  },
+  vertexShader: `
+    varying vec3 vNormal;
+    void main() {
+      vNormal = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 glowColor;
+    uniform float c;
+    uniform float p;
+    varying vec3 vNormal;
+    void main() {
+      // Calculate fresnel effect based on camera angle
+      float intensity = pow(c - dot(vNormal, vec3(0.0, 0.0, 1.0)), p);
+      gl_FragColor = vec4(glowColor, intensity * 1.5);
+    }
+  `,
+  side: THREE.FrontSide,
+  blending: THREE.AdditiveBlending,
+  transparent: true,
+  depthWrite: false
 });
-let nucleusBoundsMesh = null;  
+let nucleusBoundsMesh = null;
   
 function packSphere(n, containerRadius){
   // Simple rejection-sampled packing so nucleons don't overlap.
@@ -416,9 +437,9 @@ function rebuildNucleus(){
   protonMesh.instanceMatrix.needsUpdate = true;
   neutronMesh.instanceMatrix.needsUpdate = true;
   scene.add(protonMesh, neutronMesh);
-  // Add the bounding sphere slightly larger than the calculated nucleus radius
-  const boundsGeo = new THREE.SphereGeometry(nucleusRadius + 0.2, 32, 32);
-  nucleusBoundsMesh = new THREE.Mesh(boundsGeo, boundsMat);
+  // Add the forcefield sphere, scaled slightly larger than the nucleus
+  const boundsGeo = new THREE.SphereGeometry(nucleusRadius + 0.35, 32, 32);
+  nucleusBoundsMesh = new THREE.Mesh(boundsGeo, forcefieldMaterial);
   scene.add(nucleusBoundsMesh);
 }
 
@@ -487,9 +508,20 @@ function rebuildAtom(){
   rebuildNucleus();
   rebuildElectrons();
   const stabilityClass = updateInfoCard();
+  
+  // Existing inner glow logic
   const glow = stabilityClass === 'stable' ? 0x113322 : (stabilityClass === 'radioactive' ? 0x3a1010 : 0x3a2a10);
   protonMat.emissive.setHex(glow);
   neutronMat.emissive.setHex(glow);
+
+  // NEW: Update forcefield color based on stability
+  if (stabilityClass === 'stable') {
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0x46D18C); // Green
+  } else if (stabilityClass === 'unstable') {
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0xF5A94E); // Yellow
+  } else if (stabilityClass === 'radioactive') {
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0xFF5D5D); // Red
+  }
 }
 
 // ---------------------------------------------------------------
