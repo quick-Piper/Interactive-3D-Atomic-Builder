@@ -298,13 +298,16 @@ neutronSlider.addEventListener('input', e => {
   neutrons = parseInt(e.target.value,10);
   neutronReadout.textContent = neutrons;
   rebuildNucleus();
-  updateInfoCard();
+  const stabilityClass = updateInfoCard();
+  syncMaterials(stabilityClass); // <-- This forces the color update!
 });
+
 electronSlider.addEventListener('input', e => {
   electrons = parseInt(e.target.value,10);
   electronReadout.textContent = electrons;
   rebuildElectrons();
-  updateInfoCard();
+  const stabilityClass = updateInfoCard();
+  syncMaterials(stabilityClass); // <-- This forces the color update!
 });
 
 // ---------------------------------------------------------------
@@ -566,11 +569,8 @@ function rebuildElectrons(){
   }
 }
 
-function rebuildAtom(){
-  rebuildNucleus();
-  rebuildElectrons();
-  const stabilityClass = updateInfoCard();
-  
+// --- Global Material Sync ---
+function syncMaterials(stabilityClass) {
   // Inner particle glow
   const glow = stabilityClass === 'stable' ? 0x113322 : (stabilityClass === 'radioactive' ? 0x3a1010 : 0x3a2a10);
   protonMat.emissive.setHex(glow);
@@ -584,6 +584,13 @@ function rebuildAtom(){
   } else if (stabilityClass === 'radioactive') {
     forcefieldMaterial.uniforms.glowColor.value.setHex(0xFF5D5D); // Red (Tritium, Uranium, etc.)
   }
+}
+
+function rebuildAtom(){
+  rebuildNucleus();
+  rebuildElectrons();
+  const stabilityClass = updateInfoCard();
+  syncMaterials(stabilityClass);
 }
 
 // ---------------------------------------------------------------
