@@ -4,6 +4,8 @@ A single-file, browser-based teaching tool for building atoms. Set the proton, n
 
 No installation, no build step, no dependencies beyond one CDN script. Open `index.html` in a browser and it runs.
 
+<img width="1920" height="943" alt="Screenshot 2026-07-03 025846" src="https://github.com/user-attachments/assets/e8d24089-09e6-4b06-8a46-c087546e1e77" />
+
 ## Features
 
 **Two view modes**
