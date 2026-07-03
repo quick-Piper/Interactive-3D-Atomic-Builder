@@ -62,6 +62,18 @@
     backdrop-filter:blur(4px);
   }
   .resetBtn:hover{ background:rgba(255,255,255,0.12); }
+  .snapshot-menu{
+    position:absolute; top:52px; right:12px; display:none; flex-direction:column;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:10px;
+    overflow:hidden; z-index:5; box-shadow:0 8px 20px rgba(0,0,0,0.45); min-width:172px;
+  }
+  .snapshot-menu.open{ display:flex; }
+  .snapshot-menu button{
+    background:none; border:none; color:var(--text); text-align:left;
+    padding:10px 14px; font-size:12.5px; font-family:var(--font-ui); cursor:pointer;
+  }
+  .snapshot-menu button:hover{ background:rgba(255,255,255,0.08); }
+  .snapshot-menu button + button{ border-top:1px solid var(--border); }
   .legend{
     position:absolute; bottom:12px; right:14px; display:flex; gap:20px;
     font-size:11px; color:var(--muted); font-family:var(--font-data);
@@ -111,6 +123,8 @@
     .ec-body{ grid-template-columns:1fr; }
   }
 
+  .fact-text{ margin:0 0 16px; font-size:12.5px; line-height:1.55; color:var(--muted); font-style:italic; max-width:60ch; }
+
   .controls{ margin-top:22px; display:flex; flex-direction:column; gap:16px; }
   .control-row{ display:grid; grid-template-columns:88px 1fr 56px; align-items:center; gap:14px; }
   .control-row label{ font-size:13px; color:var(--text); }
@@ -130,7 +144,11 @@
   .readout{
     background:var(--panel-2); border:1px solid var(--border); border-radius:8px;
     text-align:center; padding:6px 0; font-family:var(--font-data); font-size:13px;
+    color:var(--text); width:100%; -moz-appearance:textfield;
   }
+  .readout::-webkit-outer-spin-button,
+  .readout::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .readout:focus{ outline:none; border-color:var(--electron); }
   .footnote{ margin-top:18px; font-size:11.5px; color:var(--muted); line-height:1.5; }
 </style>
 </head>
@@ -145,10 +163,18 @@
     <select id="elementJump"></select>
   </div>
 
+  <p class="fact-text" id="factText">—</p>
+
   <div class="stage" id="stage">
     <canvas id="canvas"></canvas>
     <button class="resetBtn" id="resetCam" title="Reset view" aria-label="Reset view">⟲</button>
     <button class="resetBtn" id="toggleView" title="Switch to 2D diagram view" aria-label="Toggle 2D/3D view" style="right:54px; font-size:11px; font-family:var(--font-data);">3D</button>
+    <button class="resetBtn" id="pauseBtn" title="Pause animation" aria-label="Pause animation" style="right:96px;">⏸</button>
+    <button class="resetBtn" id="snapshotBtn" title="Save snapshot" aria-label="Save snapshot" style="right:138px;">📷</button>
+    <div class="snapshot-menu" id="snapshotMenu">
+      <button type="button" data-bg="transparent">Transparent background</button>
+      <button type="button" data-bg="white">White background</button>
+    </div>
     <div class="hint" id="stageHint">drag to orbit · scroll to zoom</div>
     <div class="legend">
       <span><i class="dot p"></i>Proton</span>
@@ -185,17 +211,17 @@
     <div class="control-row">
       <label><i class="swatch" style="background:var(--proton)"></i>Protons</label>
       <input type="range" id="protonSlider" min="1" max="118" value="6">
-      <div class="readout" id="protonReadout">6</div>
+      <input type="number" class="readout" id="protonReadout" value="6" min="1" max="118" inputmode="numeric">
     </div>
     <div class="control-row">
       <label><i class="swatch" style="background:var(--neutron)"></i>Neutrons</label>
       <input type="range" id="neutronSlider" min="0" max="180" value="6">
-      <div class="readout" id="neutronReadout">6</div>
+      <input type="number" class="readout" id="neutronReadout" value="6" min="0" max="180" inputmode="numeric">
     </div>
     <div class="control-row">
       <label><i class="swatch" style="background:var(--electron)"></i>Electrons</label>
       <input type="range" id="electronSlider" min="0" max="130" value="6">
-      <div class="readout" id="electronReadout">6</div>
+      <input type="number" class="readout" id="electronReadout" value="6" min="0" max="130" inputmode="numeric">
     </div>
   </div>
 
@@ -208,36 +234,65 @@
 // Element data: [symbol, name, standardAtomicWeight(rounded)]
 // ---------------------------------------------------------------
 const ELEMENTS = [null,
-["H","Hydrogen",1],["He","Helium",4],["Li","Lithium",7],["Be","Beryllium",9],
-["B","Boron",11],["C","Carbon",12],["N","Nitrogen",14],["O","Oxygen",16],
-["F","Fluorine",19],["Ne","Neon",20],["Na","Sodium",23],["Mg","Magnesium",24],
-["Al","Aluminium",27],["Si","Silicon",28],["P","Phosphorus",31],["S","Sulfur",32],
-["Cl","Chlorine",35],["Ar","Argon",40],["K","Potassium",39],["Ca","Calcium",40],
-["Sc","Scandium",45],["Ti","Titanium",48],["V","Vanadium",51],["Cr","Chromium",52],
-["Mn","Manganese",55],["Fe","Iron",56],["Co","Cobalt",59],["Ni","Nickel",59],
-["Cu","Copper",64],["Zn","Zinc",65],["Ga","Gallium",70],["Ge","Germanium",73],
-["As","Arsenic",75],["Se","Selenium",79],["Br","Bromine",80],["Kr","Krypton",84],
-["Rb","Rubidium",85],["Sr","Strontium",88],["Y","Yttrium",89],["Zr","Zirconium",91],
-["Nb","Niobium",93],["Mo","Molybdenum",96],["Tc","Technetium",98],["Ru","Ruthenium",101],
-["Rh","Rhodium",103],["Pd","Palladium",106],["Ag","Silver",108],["Cd","Cadmium",112],
-["In","Indium",115],["Sn","Tin",119],["Sb","Antimony",122],["Te","Tellurium",128],
-["I","Iodine",127],["Xe","Xenon",131],["Cs","Caesium",133],["Ba","Barium",137],
-["La","Lanthanum",139],["Ce","Cerium",140],["Pr","Praseodymium",141],["Nd","Neodymium",144],
-["Pm","Promethium",145],["Sm","Samarium",150],["Eu","Europium",152],["Gd","Gadolinium",157],
-["Tb","Terbium",159],["Dy","Dysprosium",163],["Ho","Holmium",165],["Er","Erbium",167],
-["Tm","Thulium",169],["Yb","Ytterbium",173],["Lu","Lutetium",175],["Hf","Hafnium",179],
-["Ta","Tantalum",181],["W","Tungsten",184],["Re","Rhenium",186],["Os","Osmium",190],
-["Ir","Iridium",192],["Pt","Platinum",195],["Au","Gold",197],["Hg","Mercury",201],
-["Tl","Thallium",204],["Pb","Lead",207],["Bi","Bismuth",209],["Po","Polonium",209],
-["At","Astatine",210],["Rn","Radon",222],["Fr","Francium",223],["Ra","Radium",226],
-["Ac","Actinium",227],["Th","Thorium",232],["Pa","Protactinium",231],["U","Uranium",238],
-["Np","Neptunium",237],["Pu","Plutonium",244],["Am","Americium",243],["Cm","Curium",247],
-["Bk","Berkelium",247],["Cf","Californium",251],["Es","Einsteinium",252],["Fm","Fermium",257],
-["Md","Mendelevium",258],["No","Nobelium",259],["Lr","Lawrencium",266],["Rf","Rutherfordium",267],
-["Db","Dubnium",268],["Sg","Seaborgium",269],["Bh","Bohrium",270],["Hs","Hassium",270],
-["Mt","Meitnerium",278],["Ds","Darmstadtium",281],["Rg","Roentgenium",282],["Cn","Copernicium",285],
-["Nh","Nihonium",286],["Fl","Flerovium",289],["Mc","Moscovium",290],["Lv","Livermorium",293],
-["Ts","Tennessine",294],["Og","Oganesson",294]
+["H","Hydrogen",1,`The lightest and most abundant element in the universe — it fuels the Sun and every other star through fusion.`],["He","Helium",4,`So light it drifts out of Earth's atmosphere into space. Used to lift balloons — and, briefly, your voice.`],
+["Li","Lithium",7,`Powers the rechargeable battery in your phone, and is one of only three elements forged in the Big Bang.`],["Be","Beryllium",9,`Strong, light, and used in aerospace parts and X-ray windows — but surprisingly toxic to handle.`],
+["B","Boron",11,`Found in borax and used to strengthen glass, including the Pyrex in your kitchen.`],["C","Carbon",12,`The backbone of every living thing on Earth — and also diamond, graphite, and pencil lead in disguise.`],
+["N","Nitrogen",14,`Makes up about 78% of the air you're breathing right now, and it's key to the proteins in your muscles.`],["O","Oxygen",16,`The gas your cells burn for energy, and the main ingredient — by mass — of the water covering Earth.`],
+["F","Fluorine",19,`The most reactive element on the periodic table, yet it's added to toothpaste to protect your teeth.`],["Ne","Neon",20,`Glows a brilliant reddish-orange when electrified — the gas behind classic neon signs.`],
+["Na","Sodium",23,`Explosive and reactive on its own, but bonded with chlorine it becomes ordinary table salt.`],["Mg","Magnesium",24,`Burns with a blinding white light, once used in old camera flashes. Vital for hundreds of enzymes in your body.`],
+["Al","Aluminium",27,`Light, rust-resistant, and endlessly recyclable — think soda cans and airplane frames.`],["Si","Silicon",28,`The main ingredient in sand and glass, and the material behind every computer chip on Earth.`],
+["P","Phosphorus",31,`Glows faintly in the dark, which is how it earned a name meaning "light-bearer". Essential to DNA and bone.`],["S","Sulfur",32,`Smells like rotten eggs in some compounds, but it's also what gives rubber its bounce after vulcanization.`],
+["Cl","Chlorine",35,`A toxic greenish gas on its own, yet it's what keeps swimming pools and drinking water safe from germs.`],["Ar","Argon",40,`An invisible, inert gas that fills incandescent light bulbs to stop the filament from burning out.`],
+["K","Potassium",39,`Reacts violently with water, bursting into a lilac flame — and your nerves and muscles need it every day.`],["Ca","Calcium",40,`Builds the bones and teeth in your body, and is also the main ingredient in chalk and limestone.`],
+["Sc","Scandium",45,`Rare and lightweight, occasionally used in aerospace alloys and some baseball bats.`],["Ti","Titanium",48,`As strong as steel but about 45% lighter — used in jet engines, hip implants, and spacecraft.`],
+["V","Vanadium",51,`Named after a Norse goddess for its beautifully colored compounds, and used to strengthen steel tools.`],["Cr","Chromium",52,`Gives stainless steel its shine and rust resistance, and chrome plating its mirror finish.`],
+["Mn","Manganese",55,`Makes steel far tougher, and turns glass from green to clear during manufacturing.`],["Fe","Iron",56,`The most common element on Earth by mass — found at our planet's core and inside every drop of your blood.`],
+["Co","Cobalt",59,`Gives glass and ceramics a deep, vivid blue and powers many rechargeable batteries.`],["Ni","Nickel",59,`Makes coins tough and corrosion-resistant — though the US "nickel" coin is only 25% nickel.`],
+["Cu","Copper",64,`One of the few metals with a natural color other than gray or silver, and an excellent conductor of electricity.`],["Zn","Zinc",65,`Coats steel to stop it rusting (galvanizing), and helps wounds heal inside your body.`],
+["Ga","Gallium",70,`Melts right in your hand — its melting point sits just below normal body temperature.`],["Ge","Germanium",73,`A semiconductor that helped launch the transistor revolution before silicon took over.`],
+["As","Arsenic",75,`Infamous as a poison, yet tiny, carefully controlled amounts are used in semiconductors and LEDs.`],["Se","Selenium",79,`Toxic in large doses but essential in trace amounts — found naturally in Brazil nuts and your thyroid.`],
+["Br","Bromine",80,`One of only two elements that are liquid at room temperature, and used in flame retardants.`],["Kr","Krypton",84,`A rare, glowing gas used inside energy-efficient fluorescent lighting.`],
+["Rb","Rubidium",85,`So reactive it bursts into flame in air and explodes on contact with water.`],["Sr","Strontium",88,`Gives fireworks their brilliant red color when burned.`],
+["Y","Yttrium",89,`Used in the red phosphors that once lit up old cathode-ray TV screens.`],["Zr","Zirconium",91,`Extremely resistant to corrosion, so it's used to coat nuclear reactor fuel rods.`],
+["Nb","Niobium",93,`Superconducts electricity at very low temperatures — key to the magnets inside MRI machines.`],["Mo","Molybdenum",96,`Toughens steel for drill bits and armor plating.`],
+["Tc","Technetium",98,`The first element ever created artificially rather than discovered in nature — and it's radioactive.`],["Ru","Ruthenium",101,`A rare, hard metal used to make electrical contacts more wear-resistant.`],
+["Rh","Rhodium",103,`One of the rarest metals on Earth, prized for coating catalytic converters.`],["Pd","Palladium",106,`Absorbs hydrogen gas like a sponge — up to 900 times its own volume.`],
+["Ag","Silver",108,`The best natural conductor of electricity, long prized for mirrors, coins, and jewelry.`],["Cd","Cadmium",112,`Once common in rechargeable batteries, but it's toxic and now heavily restricted.`],
+["In","Indium",115,`Soft enough to dent with a fingernail, and used to make touchscreen glass electrically conductive.`],["Sn","Tin",119,`Coats steel cans to stop them rusting — a "tin can" is actually mostly steel underneath.`],
+["Sb","Antimony",122,`Used since ancient Egypt as kohl eyeliner, and today in batteries and flame retardants.`],["Te","Tellurium",128,`Rare enough that some say it's harder to find than gold, and it can make your breath smell like garlic.`],
+["I","Iodine",127,`Turns starch blue-black on contact, a trick forensic scientists use to reveal fingerprints on paper.`],["Xe","Xenon",131,`Used in some car headlights and in the ion engines that quietly power deep-space probes.`],
+["Cs","Caesium",133,`So reactive it explodes on contact with water — and its atomic vibrations define the exact length of a second.`],["Ba","Barium",137,`Swallowed as a "barium meal" before certain X-rays, since it blocks radiation and lights up the digestive tract.`],
+["La","Lanthanum",139,`Opens the lanthanide row of the periodic table, and is used in camera lenses and hybrid car batteries.`],["Ce","Cerium",140,`The most abundant rare-earth element, found in self-cleaning ovens and lighter flints.`],
+["Pr","Praseodymium",141,`Colors glass and ceramics a vivid yellow-green, and strengthens aircraft engine alloys.`],["Nd","Neodymium",144,`Makes the strongest permanent magnets known — found inside headphones and wind turbines.`],
+["Pm","Promethium",145,`The only lanthanide with no stable isotopes at all — it's radioactive through and through.`],["Sm","Samarium",150,`Used in powerful magnets that keep their strength even at high temperatures.`],
+["Eu","Europium",152,`Produces the red glow in old TV phosphors and helps fight banknote counterfeiting.`],["Gd","Gadolinium",157,`Highly magnetic, and injected in small amounts as a contrast agent during MRI scans.`],
+["Tb","Terbium",159,`Glows green under mechanical stress, useful in sensors and energy-efficient lamps.`],["Dy","Dysprosium",163,`Keeps magnets working reliably at the high temperatures inside electric car motors.`],
+["Ho","Holmium",165,`Has the strongest magnetic pull of any element in its solid, uncombined form.`],["Er","Erbium",167,`Used in the glass fibers that carry the internet across oceans as pulses of light.`],
+["Tm","Thulium",169,`One of the rarest and most expensive of the naturally occurring rare-earth elements.`],["Yb","Ytterbium",173,`Used in some of the most precise atomic clocks ever built.`],
+["Lu","Lutetium",175,`The heaviest and hardest of the lanthanides, used inside PET medical scanners.`],["Hf","Hafnium",179,`Absorbs neutrons very effectively, so it's used to control nuclear reactors.`],
+["Ta","Tantalum",181,`Resists corrosion so well that it's used for surgical implants inside the human body.`],["W","Tungsten",184,`Has the highest melting point of any metal — it once glowed inside every incandescent light bulb.`],
+["Re","Rhenium",186,`One of the densest and rarest metals on Earth, used in high-performance jet engine parts.`],["Os","Osmium",190,`The densest naturally occurring element on the entire periodic table.`],
+["Ir","Iridium",192,`So corrosion-resistant it's used for the tips of fine fountain pens and spark plugs.`],["Pt","Platinum",195,`Rarer than gold and prized in jewelry, and essential inside catalytic converters.`],
+["Au","Gold",197,`Doesn't tarnish or corrode, which is why ancient gold artifacts still shine today.`],["Hg","Mercury",201,`The only metal that's liquid at room temperature, once common inside glass thermometers.`],
+["Tl","Thallium",204,`Once nicknamed "inheritance powder" for its grim use — and misuse — as an odorless, tasteless poison.`],["Pb","Lead",207,`Dense and easy to shape, once common in pipes and paint before its toxicity was fully understood.`],
+["Bi","Bismuth",209,`The heaviest element with a nearly stable isotope, and famous for its strikingly colorful, geometric crystals.`],["Po","Polonium",209,`Discovered by Marie Curie, who named it after her homeland, Poland. Intensely radioactive.`],
+["At","Astatine",210,`So rare that less than a single gram is estimated to exist in Earth's crust at any given moment.`],["Rn","Radon",222,`An invisible radioactive gas that can seep up into basements from rock and soil below.`],
+["Fr","Francium",223,`One of the rarest elements on Earth — only a handful of atoms may exist naturally at once.`],["Ra","Radium",226,`Once painted onto glow-in-the-dark watch dials, until its radioactivity was found to have poisoned the painters.`],
+["Ac","Actinium",227,`Glows with a faint blue light in the dark, a direct result of its intense radioactivity.`],["Th","Thorium",232,`More abundant in the Earth's crust than uranium, and being explored as a safer nuclear fuel.`],
+["Pa","Protactinium",231,`Rare, radioactive, and difficult to isolate — it was only discovered in the early 20th century.`],["U","Uranium",238,`Powers nuclear reactors around the world and, in far more concentrated form, nuclear weapons.`],
+["Np","Neptunium",237,`The first transuranium element ever discovered, created artificially in a laboratory.`],["Pu","Plutonium",244,`Powered the Nagasaki bomb, and today powers spacecraft exploring the outer solar system.`],
+["Am","Americium",243,`Sits inside most household smoke detectors, helping them sense tiny smoke particles.`],["Cm","Curium",247,`Named after Marie and Pierre Curie, the pioneering scientists behind early radioactivity research.`],
+["Bk","Berkelium",247,`Named after Berkeley, California, home of the laboratory where it was first synthesized.`],["Cf","Californium",251,`So radioactive that a small sample can generate a faint glow of its own.`],
+["Es","Einsteinium",252,`Discovered in the radioactive debris of the first hydrogen bomb test.`],["Fm","Fermium",257,`Also discovered in hydrogen bomb test debris, and named after physicist Enrico Fermi.`],
+["Md","Mendelevium",258,`Made just one atom at a time in early experiments, and named after Dmitri Mendeleev.`],["No","Nobelium",259,`Named after Alfred Nobel, founder of the Nobel Prizes.`],
+["Lr","Lawrencium",266,`Named after Ernest Lawrence, inventor of the particle accelerator.`],["Rf","Rutherfordium",267,`A synthetic element that exists for only fractions of a second before decaying away.`],
+["Db","Dubnium",268,`Named after Dubna, Russia, home to the laboratory that helped create it.`],["Sg","Seaborgium",269,`Named after Glenn Seaborg — at the time, the only element ever named after a living person.`],
+["Bh","Bohrium",270,`Named in honor of physicist Niels Bohr, a founding figure of atomic theory.`],["Hs","Hassium",270,`Named after Hesse, Germany, home to the laboratory where it was discovered.`],
+["Mt","Meitnerium",278,`Named after physicist Lise Meitner, a pioneer of nuclear fission research.`],["Ds","Darmstadtium",281,`Named after Darmstadt, Germany, where it was first created.`],
+["Rg","Roentgenium",282,`Named after Wilhelm Röntgen, the discoverer of X-rays.`],["Cn","Copernicium",285,`Named after astronomer Nicolaus Copernicus.`],
+["Nh","Nihonium",286,`The first element discovered and named by researchers in Japan — "Nihon" means Japan.`],["Fl","Flerovium",289,`Named after the Flerov Laboratory in Russia, where superheavy elements are made.`],
+["Mc","Moscovium",290,`Named after Moscow, home to the laboratory that helped discover it.`],["Lv","Livermorium",293,`Named after Livermore, California, home to a major nuclear research lab.`],
+["Ts","Tennessine",294,`Named after Tennessee, home to laboratories involved in its discovery.`],["Og","Oganesson",294,`The heaviest element on the periodic table, existing for only a tiny fraction of a second before decaying.`]
 ];
 const NO_STABLE = new Set([43,61]); // Tc, Pm
 const REDUCED_MOTION = false; // Override system settings so animations always play
@@ -329,7 +384,8 @@ for(let z=1; z<ELEMENTS.length; z++){
 jumpSelect.value = protons;
 
 function updateInfoCard(){
-  const [sym,name] = ELEMENTS[protons];
+  const [sym,name,,fact] = ELEMENTS[protons];
+  document.getElementById('factText').textContent = fact;
   const mass = protons + neutrons;
   const charge = protons - electrons;
 
@@ -371,9 +427,9 @@ function updateInfoCard(){
 }
 
 function syncReadouts(){
-  protonSlider.value = protons; protonReadout.textContent = protons;
-  neutronSlider.value = neutrons; neutronReadout.textContent = neutrons;
-  electronSlider.value = electrons; electronReadout.textContent = electrons;
+  protonSlider.value = protons; protonReadout.value = protons;
+  neutronSlider.value = neutrons; neutronReadout.value = neutrons;
+  electronSlider.value = electrons; electronReadout.value = electrons;
 }
 
 // Calculates the outermost active shell and backs the camera up to fit it
@@ -389,6 +445,8 @@ function autoZoomCamera() {
   
   // Multiply by 2.4 to account for the camera's 45-degree field of view, plus a little padding
   camState.targetRadius = Math.min(35, maxRad * 2.4 + 1.5); 
+  camState.panX = 0;
+  camState.panY = 0;
 }
 
 function onProtonsChanged(newZ, autoZoom = false){
@@ -401,24 +459,45 @@ function onProtonsChanged(newZ, autoZoom = false){
   if (autoZoom) autoZoomCamera();
 }
 
+function clampInt(v, min, max){
+  if(Number.isNaN(v)) v = min;
+  return Math.min(max, Math.max(min, Math.round(v)));
+}
+
+function setNeutrons(val){
+  neutrons = clampInt(val, parseInt(neutronSlider.min,10), parseInt(neutronSlider.max,10));
+  neutronSlider.value = neutrons;
+  neutronReadout.value = neutrons;
+  rebuildNucleus();
+  const stabilityClass = updateInfoCard();
+  syncMaterials(stabilityClass); // <-- This forces the color update!
+}
+
+function setElectrons(val){
+  electrons = clampInt(val, parseInt(electronSlider.min,10), parseInt(electronSlider.max,10));
+  electronSlider.value = electrons;
+  electronReadout.value = electrons;
+  rebuildElectrons();
+  const stabilityClass = updateInfoCard();
+  syncMaterials(stabilityClass); // <-- This forces the color update!
+}
+
 // Dropdown: Enables autoZoom
 jumpSelect.addEventListener('change', e => onProtonsChanged(parseInt(e.target.value, 10), true));
 // Slider: Keeps autoZoom false
 protonSlider.addEventListener('input', e => onProtonsChanged(parseInt(e.target.value, 10), false));
-neutronSlider.addEventListener('input', e => {
-  neutrons = parseInt(e.target.value,10);
-  neutronReadout.textContent = neutrons;
-  rebuildNucleus();
-  const stabilityClass = updateInfoCard();
-  syncMaterials(stabilityClass); // <-- This forces the color update!
-});
+neutronSlider.addEventListener('input', e => setNeutrons(parseInt(e.target.value, 10)));
+electronSlider.addEventListener('input', e => setElectrons(parseInt(e.target.value, 10)));
 
-electronSlider.addEventListener('input', e => {
-  electrons = parseInt(e.target.value,10);
-  electronReadout.textContent = electrons;
-  rebuildElectrons();
-  const stabilityClass = updateInfoCard();
-  syncMaterials(stabilityClass); // <-- This forces the color update!
+// Numeric readout boxes: type a value directly instead of dragging the slider
+protonReadout.addEventListener('change', e => {
+  const val = clampInt(parseInt(e.target.value, 10), parseInt(protonSlider.min,10), parseInt(protonSlider.max,10));
+  onProtonsChanged(val, false);
+});
+neutronReadout.addEventListener('change', e => setNeutrons(parseInt(e.target.value, 10)));
+electronReadout.addEventListener('change', e => setElectrons(parseInt(e.target.value, 10)));
+[protonReadout, neutronReadout, electronReadout].forEach(input => {
+  input.addEventListener('keydown', e => { if(e.key === 'Enter') input.blur(); });
 });
 
 // ---------------------------------------------------------------
@@ -426,7 +505,7 @@ electronSlider.addEventListener('input', e => {
 // ---------------------------------------------------------------
 const stageEl = document.getElementById('stage');
 const canvas = document.getElementById('canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, preserveDrawingBuffer:true });
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
 
@@ -448,7 +527,7 @@ rim.position.set(-5,-3,-4);
 scene.add(rim);
 
 // --- Camera orbit & zoom control ---
-const camState = { radius:7.5, theta:0.7, phi:1.15, targetRadius:7.5 };
+const camState = { radius:7.5, theta:0.7, phi:1.15, targetRadius:7.5, panX:0, panY:0 };
 const DEFAULT_CAM = { radius:7.5, theta:0.7, phi:1.15 };
 let dragging = false, lastX=0, lastY=0;
 
@@ -456,13 +535,18 @@ const activePointers = new Map();
 let initialPinchDist = -1;
 
 function applyCamera(){
-  const { radius, theta, phi } = camState;
-  camera.position.set(
-    radius * Math.sin(phi) * Math.sin(theta),
-    radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.cos(theta)
-  );
-  camera.lookAt(0,0,0);
+  const { radius, theta, phi, panX, panY } = camState;
+  if(is2D){
+    camera.position.set(panX, panY, radius);
+    camera.lookAt(panX, panY, 0);
+  } else {
+    camera.position.set(
+      radius * Math.sin(phi) * Math.sin(theta),
+      radius * Math.cos(phi),
+      radius * Math.sin(phi) * Math.cos(theta)
+    );
+    camera.lookAt(0,0,0);
+  }
 }
 
 canvas.addEventListener('pointerdown', e => {
@@ -484,7 +568,13 @@ canvas.addEventListener('pointermove', e => {
   if(activePointers.size === 1 && dragging) {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     lastX = e.clientX; lastY = e.clientY;
-    if(!is2D){
+    if(is2D){
+      // Pan across the flat diagram (same gesture on mouse, touch, and trackpad)
+      const panScale = camState.radius * 0.0022;
+      const maxPan = 14;
+      camState.panX = Math.min(maxPan, Math.max(-maxPan, camState.panX - dx * panScale));
+      camState.panY = Math.min(maxPan, Math.max(-maxPan, camState.panY + dy * panScale));
+    } else {
       camState.theta -= dx * 0.006;
       camState.phi = Math.min(Math.PI-0.15, Math.max(0.15, camState.phi - dy * 0.006));
     }
@@ -525,6 +615,8 @@ document.getElementById('resetCam').addEventListener('click', () => {
   camState.targetRadius = DEFAULT_CAM.radius;
   camState.theta = is2D ? FLAT_CAM.theta : DEFAULT_CAM.theta;
   camState.phi = is2D ? FLAT_CAM.phi : DEFAULT_CAM.phi;
+  camState.panX = 0;
+  camState.panY = 0;
 });
 
 // --- 2D / 3D view toggle ---
@@ -536,28 +628,108 @@ function setViewMode(next2D){
   is2D = next2D;
   toggleViewBtn.textContent = is2D ? '2D' : '3D';
   toggleViewBtn.title = is2D ? 'Switch to 3D model view' : 'Switch to 2D diagram view';
-  stageHint.textContent = is2D ? 'scroll to zoom · flat diagram view' : 'drag to orbit · scroll to zoom';
+  stageHint.textContent = is2D ? 'drag to pan · scroll to zoom' : 'drag to orbit · scroll to zoom';
   if(is2D){
     camState.theta = FLAT_CAM.theta;
     camState.phi = FLAT_CAM.phi;
+    camState.panX = 0;
+    camState.panY = 0;
   }
+  rebuildNucleus();   // swap flat/lit nucleon materials and show/hide the forcefield glow
   rebuildElectrons(); // shells/electrons are laid out differently in each mode
   updateElectronConfigCard();
 }
 
 toggleViewBtn.addEventListener('click', () => setViewMode(!is2D));
 
+// --- Pause / resume animation ---
+let isPaused = false;
+let pauseStart = 0;
+let totalPausedDuration = 0;
+const pauseBtn = document.getElementById('pauseBtn');
+pauseBtn.addEventListener('click', () => {
+  isPaused = !isPaused;
+  if(isPaused){
+    pauseStart = clock.getElapsedTime();
+  } else {
+    totalPausedDuration += clock.getElapsedTime() - pauseStart;
+  }
+  pauseBtn.textContent = isPaused ? '▶' : '⏸';
+  pauseBtn.title = isPaused ? 'Resume animation' : 'Pause animation';
+  pauseBtn.setAttribute('aria-label', pauseBtn.title);
+});
+
+// --- Snapshot ---
+const snapshotBtn = document.getElementById('snapshotBtn');
+const snapshotMenu = document.getElementById('snapshotMenu');
+
+snapshotBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  snapshotMenu.classList.toggle('open');
+});
+document.addEventListener('click', () => snapshotMenu.classList.remove('open'));
+snapshotMenu.addEventListener('click', e => e.stopPropagation());
+
+snapshotMenu.querySelectorAll('button[data-bg]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    takeSnapshot(btn.dataset.bg);
+    snapshotMenu.classList.remove('open');
+  });
+});
+
+function takeSnapshot(bg){
+  if(bg === 'white'){
+    renderer.setClearColor(0xffffff, 1);
+  } else {
+    renderer.setClearColor(0x000000, 0);
+  }
+  renderer.render(scene, camera); // re-render this frame with the chosen background baked in
+  const dataURL = renderer.domElement.toDataURL('image/png');
+
+  // restore the transparent live-preview background
+  renderer.setClearColor(0x000000, 0);
+  renderer.render(scene, camera);
+
+  const sym = ELEMENTS[protons][0];
+  const link = document.createElement('a');
+  link.href = dataURL;
+  link.download = `atom-${sym}-${protons}${is2D ? '-2d' : '-3d'}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 // --- Nucleus ---
 const protonMat = new THREE.MeshStandardMaterial({ color:0xFF5D5D, emissive:0x001133, roughness:0.35, metalness:0.1 });
 const neutronMat = new THREE.MeshStandardMaterial({ color:0x9AA3B2, emissive:0x0a0a0d, roughness:0.4, metalness:0.1 });
-const nucleonGeo = new THREE.IcosahedronGeometry(0.16, 3);
-let protonMesh = null, neutronMesh = null;
+const protonMatFlat = new THREE.MeshBasicMaterial({ color:0xFF5D5D });
+const neutronMatFlat = new THREE.MeshBasicMaterial({ color:0x9AA3B2 });
+
+// Darker outline shells (rendered back-face-only, slightly larger) so protons
+// and neutrons read as distinct particles rather than a blended mass.
+function darkenHex(hex, factor){
+  const c = new THREE.Color(hex);
+  c.multiplyScalar(factor);
+  return c.getHex();
+}
+const protonOutlineMat = new THREE.MeshBasicMaterial({ color: darkenHex(0xFF5D5D, 0.25), side: THREE.BackSide });
+const neutronOutlineMat = new THREE.MeshBasicMaterial({ color: darkenHex(0x9AA3B2, 0.25), side: THREE.BackSide });
+const OUTLINE_SCALE = 1.22;
+
+const NUCLEON_RADIUS = 0.16;
+const nucleonGeo = new THREE.IcosahedronGeometry(NUCLEON_RADIUS, 3);
+let protonMesh = null, neutronMesh = null, protonOutlineMesh = null, neutronOutlineMesh = null;
 let nucleusRadius = 1;
 
-// --- Dynamic Forcefield Shader ---
+// --- Nucleus stability indicators ---
+// 2D: a simple flat line circle, colored by stability class.
+const nucleusRingMat = new THREE.LineBasicMaterial({ color:0x46D18C, transparent:true, opacity:0.9 });
+let nucleusRingMesh = null;
+
+// 3D: the glowing fresnel "forcefield" shader sphere.
 const forcefieldMaterial = new THREE.ShaderMaterial({
   uniforms: {
-    glowColor: { value: new THREE.Color(0x46D18C) }, 
+    glowColor: { value: new THREE.Color(0x46D18C) },
     c: { value: 1.2 }, // Intensity multiplier (brightness)
     p: { value: 3.0 }  // Falloff sharpness (how quickly it fades to the center)
   },
@@ -574,7 +746,6 @@ const forcefieldMaterial = new THREE.ShaderMaterial({
     uniform float p;
     varying vec3 vNormal;
     void main() {
-      // 1.0 minus the dot product ensures the edge is 1 and center is 0
       float intensity = pow(1.0 - max(dot(vNormal, vec3(0.0, 0.0, 1.0)), 0.0), p) * c;
       gl_FragColor = vec4(glowColor, intensity);
     }
@@ -585,9 +756,22 @@ const forcefieldMaterial = new THREE.ShaderMaterial({
   depthWrite: false
 });
 let nucleusBoundsMesh = null;
-  
+
+function buildRingPoints(radius, flat){
+  const pts = [];
+  const segs = 96;
+  for(let i=0;i<=segs;i++){
+    const a = (i/segs) * Math.PI * 2;
+    pts.push(flat
+      ? new THREE.Vector3(radius*Math.cos(a), radius*Math.sin(a), 0)
+      : new THREE.Vector3(radius*Math.cos(a), 0, radius*Math.sin(a))
+    );
+  }
+  return pts;
+}
+
 function packSphere(n, containerRadius){
-  // Simple rejection-sampled packing so nucleons don't overlap.
+  // Simple rejection-sampled packing so nucleons don't overlap. (3D mode)
   const pts = [];
   const minDist = 0.19;
   let attempts = 0;
@@ -613,9 +797,12 @@ function packSphere(n, containerRadius){
 }
 
 function rebuildNucleus(){
-  if(protonMesh){ scene.remove(protonMesh); protonMesh.geometry.dispose(); }
-  if(neutronMesh){ scene.remove(neutronMesh); neutronMesh.geometry.dispose(); }
-  if(nucleusBoundsMesh){ scene.remove(nucleusBoundsMesh); nucleusBoundsMesh.geometry.dispose(); }
+  if(protonMesh){ scene.remove(protonMesh); }
+  if(neutronMesh){ scene.remove(neutronMesh); }
+  if(protonOutlineMesh){ scene.remove(protonOutlineMesh); }
+  if(neutronOutlineMesh){ scene.remove(neutronOutlineMesh); }
+  if(nucleusRingMesh){ scene.remove(nucleusRingMesh); nucleusRingMesh.geometry.dispose(); nucleusRingMesh = null; }
+  if(nucleusBoundsMesh){ scene.remove(nucleusBoundsMesh); nucleusBoundsMesh.geometry.dispose(); nucleusBoundsMesh = null; }
 
   const A = protons + neutrons;
   nucleusRadius = 0.42 + 0.16 * Math.cbrt(Math.max(A,1));
@@ -625,8 +812,9 @@ function rebuildNucleus(){
   const protonPts = allPts.slice(0, protons);
   const neutronPts = allPts.slice(protons);
 
-  protonMesh = new THREE.InstancedMesh(nucleonGeo, protonMat, Math.max(protons,1));
-  neutronMesh = new THREE.InstancedMesh(nucleonGeo, neutronMat, Math.max(neutrons,1));
+  protonMesh = new THREE.InstancedMesh(nucleonGeo, is2D ? protonMatFlat : protonMat, Math.max(protons,1));
+  neutronMesh = new THREE.InstancedMesh(nucleonGeo, is2D ? neutronMatFlat : neutronMat, Math.max(neutrons,1));
+
   const m = new THREE.Matrix4();
   for(let i=0;i<protons;i++){ m.setPosition(protonPts[i]); protonMesh.setMatrixAt(i, m); }
   for(let i=0;i<neutrons;i++){ m.setPosition(neutronPts[i]); neutronMesh.setMatrixAt(i, m); }
@@ -634,16 +822,39 @@ function rebuildNucleus(){
   if(neutrons===0){ m.setPosition(new THREE.Vector3(9999,9999,9999)); neutronMesh.setMatrixAt(0,m); }
   protonMesh.instanceMatrix.needsUpdate = true;
   neutronMesh.instanceMatrix.needsUpdate = true;
-  scene.add(protonMesh, neutronMesh);
-  // Add the forcefield sphere, scaled slightly larger than the nucleus
-  const boundsGeo = new THREE.SphereGeometry(nucleusRadius + 0.35, 64, 64);
-  nucleusBoundsMesh = new THREE.Mesh(boundsGeo, forcefieldMaterial);
-  scene.add(nucleusBoundsMesh);
+
+  if(is2D){
+    // --- 2D only: darker outline shells so protons/neutrons read as distinct dots ---
+    protonOutlineMesh = new THREE.InstancedMesh(nucleonGeo, protonOutlineMat, Math.max(protons,1));
+    neutronOutlineMesh = new THREE.InstancedMesh(nucleonGeo, neutronOutlineMat, Math.max(neutrons,1));
+    const mOutline = new THREE.Matrix4();
+    const outlineScaleVec = new THREE.Vector3(OUTLINE_SCALE, OUTLINE_SCALE, OUTLINE_SCALE);
+    const identityQuat = new THREE.Quaternion();
+    for(let i=0;i<protons;i++){ mOutline.compose(protonPts[i], identityQuat, outlineScaleVec); protonOutlineMesh.setMatrixAt(i, mOutline); }
+    for(let i=0;i<neutrons;i++){ mOutline.compose(neutronPts[i], identityQuat, outlineScaleVec); neutronOutlineMesh.setMatrixAt(i, mOutline); }
+    if(protons===0){ mOutline.compose(new THREE.Vector3(9999,9999,9999), identityQuat, outlineScaleVec); protonOutlineMesh.setMatrixAt(0,mOutline); }
+    if(neutrons===0){ mOutline.compose(new THREE.Vector3(9999,9999,9999), identityQuat, outlineScaleVec); neutronOutlineMesh.setMatrixAt(0,mOutline); }
+    protonOutlineMesh.instanceMatrix.needsUpdate = true;
+    neutronOutlineMesh.instanceMatrix.needsUpdate = true;
+    scene.add(protonOutlineMesh, neutronOutlineMesh, protonMesh, neutronMesh);
+
+    // --- 2D only: flat stability ring in place of the 3D forcefield glow ---
+    const ringGeo = new THREE.BufferGeometry().setFromPoints(buildRingPoints(nucleusRadius + 0.3, true));
+    nucleusRingMesh = new THREE.Line(ringGeo, nucleusRingMat);
+    scene.add(nucleusRingMesh);
+  } else {
+    // --- 3D only: plain lit dots plus the glowing forcefield shader sphere ---
+    scene.add(protonMesh, neutronMesh);
+    const boundsGeo = new THREE.SphereGeometry(nucleusRadius + 0.35, 64, 64);
+    nucleusBoundsMesh = new THREE.Mesh(boundsGeo, forcefieldMaterial);
+    scene.add(nucleusBoundsMesh);
+  }
 }
 
 // --- Electron shells ---
 const electronGeo = new THREE.SphereGeometry(0.1, 32, 32);
 const electronMat = new THREE.MeshStandardMaterial({ color:0x4CC9F0, emissive:0x3a0a0a, roughness:0.2, metalness:0.2 });
+const electronMatFlat = new THREE.MeshBasicMaterial({ color:0x4CC9F0 });
 const shellRingMat = new THREE.LineBasicMaterial({ color:0x2a3342, transparent:true, opacity:0.5 });
 const shellRingMatFlat = new THREE.LineBasicMaterial({ color:0x3d4a5e, transparent:true, opacity:0.85 });
 let electronMeshes = []; // {mesh, base:Vector3, axis:Vector3, speed, phase}
@@ -688,7 +899,7 @@ function rebuildElectrons(){
     }
 
     for(let i=0;i<countInShell;i++){
-      const mesh = new THREE.Mesh(electronGeo, electronMat);
+      const mesh = new THREE.Mesh(electronGeo, is2D ? electronMatFlat : electronMat);
       scene.add(mesh);
 
       if(is2D){
@@ -720,19 +931,19 @@ function rebuildElectrons(){
 
 // --- Global Material Sync ---
 function syncMaterials(stabilityClass) {
-  // Inner particle glow
+  // Inner particle glow (3D only — flat 2D materials ignore emissive)
   const glow = stabilityClass === 'stable' ? 0x113322 : (stabilityClass === 'radioactive' ? 0x3a1010 : 0x3a2a10);
   protonMat.emissive.setHex(glow);
   neutronMat.emissive.setHex(glow);
 
-  // Forcefield color sync
-  if (stabilityClass === 'stable') {
-    forcefieldMaterial.uniforms.glowColor.value.setHex(0x46D18C); // Green
-  } else if (stabilityClass === 'unstable') {
-    forcefieldMaterial.uniforms.glowColor.value.setHex(0xF5A94E); // Yellow (H-4, H-5, etc.)
-  } else if (stabilityClass === 'radioactive') {
-    forcefieldMaterial.uniforms.glowColor.value.setHex(0xFF5D5D); // Red (Tritium, Uranium, etc.)
-  }
+  const stabilityHex = stabilityClass === 'stable' ? 0x46D18C
+    : stabilityClass === 'radioactive' ? 0xFF5D5D
+    : 0xF5A94E;
+
+  // 2D ring color
+  nucleusRingMat.color.setHex(stabilityHex);
+  // 3D forcefield glow color
+  forcefieldMaterial.uniforms.glowColor.value.setHex(stabilityHex);
 }
 
 function rebuildAtom(){
@@ -749,13 +960,13 @@ const clock = new THREE.Clock();
 const q = new THREE.Quaternion();
 function animate(){
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
+  const t = clock.getElapsedTime() - totalPausedDuration;
 
-  if(!dragging && !REDUCED_MOTION && !is2D){ camState.theta += 0.0016; }
+  if(!dragging && !REDUCED_MOTION && !is2D && !isPaused){ camState.theta += 0.0016; }
   camState.radius += (camState.targetRadius - camState.radius) * 0.12;
   applyCamera();
 
-  if(!REDUCED_MOTION){
+  if(!REDUCED_MOTION && !isPaused){
     electronMeshes.forEach(o => {
       if(o.flat){
         const a = o.flatAngle0 + t * o.speed;
