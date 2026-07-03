@@ -12,9 +12,9 @@
     --border: #1E2530;
     --text: #E7ECF3;
     --muted: #6B7684;
-    --proton: #4CC9F0;    /* Now Blue */
+    --proton: #FF5D5D;
     --neutron: #9AA3B2;
-    --electron: #FF5D5D;  /* Now Red */
+    --electron: #4CC9F0; 
     --stable: #46D18C;
     --unstable: #F5A94E;
     --radioactive: #FF5D5D;
@@ -412,8 +412,7 @@ document.getElementById('resetCam').addEventListener('click', () => {
 });
 
 // --- Nucleus ---
-// Protons are now Blue
-const protonMat = new THREE.MeshStandardMaterial({ color:0x4CC9F0, emissive:0x001133, roughness:0.35, metalness:0.1 });
+const protonMat = new THREE.MeshStandardMaterial({ color:0xFF5D5D, emissive:0x001133, roughness:0.35, metalness:0.1 });
 const neutronMat = new THREE.MeshStandardMaterial({ color:0x9AA3B2, emissive:0x0a0a0d, roughness:0.4, metalness:0.1 });
 const nucleonGeo = new THREE.IcosahedronGeometry(0.16, 3);
 let protonMesh = null, neutronMesh = null;
@@ -508,8 +507,7 @@ function rebuildNucleus(){
 
 // --- Electron shells ---
 const electronGeo = new THREE.SphereGeometry(0.1, 32, 32);
-// Electrons are now Red
-const electronMat = new THREE.MeshStandardMaterial({ color:0xFF5D5D, emissive:0x3a0a0a, roughness:0.2, metalness:0.2 });
+const electronMat = new THREE.MeshStandardMaterial({ color:0x4CC9F0, emissive:0x3a0a0a, roughness:0.2, metalness:0.2 });
 const shellRingMat = new THREE.LineBasicMaterial({ color:0x2a3342, transparent:true, opacity:0.5 });
 let electronMeshes = []; // {mesh, base:Vector3, axis:Vector3, speed, phase}
 let shellRings = [];
@@ -573,18 +571,18 @@ function rebuildAtom(){
   rebuildElectrons();
   const stabilityClass = updateInfoCard();
   
-  // Existing inner glow logic
+  // Inner particle glow
   const glow = stabilityClass === 'stable' ? 0x113322 : (stabilityClass === 'radioactive' ? 0x3a1010 : 0x3a2a10);
   protonMat.emissive.setHex(glow);
   neutronMat.emissive.setHex(glow);
 
-  // NEW: Update forcefield color based on stability
+  // Forcefield color sync
   if (stabilityClass === 'stable') {
     forcefieldMaterial.uniforms.glowColor.value.setHex(0x46D18C); // Green
   } else if (stabilityClass === 'unstable') {
-    forcefieldMaterial.uniforms.glowColor.value.setHex(0xF5A94E); // Yellow
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0xF5A94E); // Yellow (H-4, H-5, etc.)
   } else if (stabilityClass === 'radioactive') {
-    forcefieldMaterial.uniforms.glowColor.value.setHex(0xFF5D5D); // Red
+    forcefieldMaterial.uniforms.glowColor.value.setHex(0xFF5D5D); // Red (Tritium, Uranium, etc.)
   }
 }
 
