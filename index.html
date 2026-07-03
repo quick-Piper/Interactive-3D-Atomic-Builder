@@ -89,14 +89,26 @@
   .info-value.radioactive{ color:var(--radioactive); }
 
   .electron-config-card{
-    display:grid; grid-template-columns:1fr 1fr; gap:1px;
-    background:var(--border); border:1px solid var(--border); border-radius:12px;
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
     overflow:hidden; margin-top:14px;
   }
+  .ec-header{
+    width:100%; display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel-2); border:none; color:var(--electron); cursor:pointer;
+    padding:11px 16px; font-family:var(--font-data); font-size:10.5px;
+    letter-spacing:0.08em; text-transform:uppercase;
+  }
+  .ec-header:hover{ background:#1a2028; }
+  .ec-chevron{ font-size:12px; color:var(--muted); transition:transform 0.2s ease; }
+  .electron-config-card.collapsed .ec-chevron{ transform:rotate(-90deg); }
+  .ec-body{
+    display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border);
+  }
+  .electron-config-card.collapsed .ec-body{ display:none; }
   .ec-col{ background:var(--panel); padding:14px 16px; }
   .ec-value{ font-family:var(--font-data); font-size:14px; letter-spacing:0.01em; line-height:1.65; word-break:break-word; }
   @media (max-width:560px){
-    .electron-config-card{ grid-template-columns:1fr; }
+    .ec-body{ grid-template-columns:1fr; }
   }
 
   .controls{ margin-top:22px; display:flex; flex-direction:column; gap:16px; }
@@ -120,17 +132,6 @@
     text-align:center; padding:6px 0; font-family:var(--font-data); font-size:13px;
   }
   .footnote{ margin-top:18px; font-size:11.5px; color:var(--muted); line-height:1.5; }
-  .electron-config-card { 
-    transition: all 0.3s ease; 
-  }
-  .ec-header { 
-    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
-    background: var(--panel); padding: 14px 16px; border-bottom: 1px solid var(--border);
-  }
-  .ec-content { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
-  .collapsed .ec-content { display: none; }
-  .chevron { transition: transform 0.3s ease; display: inline-block; }
-  .collapsed .chevron { transform: rotate(-90deg); }
 </style>
 </head>
 <body>
@@ -157,17 +158,17 @@
   </div>
 
   <div class="electron-config-card" id="electronConfigCard" style="display:none;">
-    <div class="ec-header" onclick="toggleConfig()">
-      <div class="info-label" style="margin-bottom:0">Electron Configuration</div>
-      <span class="chevron">▼</span>
-    </div>
-    <div class="ec-content">
+    <button class="ec-header" id="ecToggleBtn" type="button" aria-expanded="true" aria-controls="ecBody">
+      <span>Electron Configuration</span>
+      <span class="ec-chevron" id="ecChevron">▾</span>
+    </button>
+    <div class="ec-body" id="ecBody">
       <div class="ec-col">
-        <div class="info-label">Shell</div>
+        <div class="info-label">Shell Configuration</div>
         <div class="ec-value" id="shellConfigValue">—</div>
       </div>
       <div class="ec-col">
-        <div class="info-label">Orbital</div>
+        <div class="info-label">Orbital Configuration</div>
         <div class="ec-value" id="orbitalConfigValue">—</div>
       </div>
     </div>
@@ -284,10 +285,18 @@ function getOrbitalConfig(e){
 function updateElectronConfigCard(){
   const card = document.getElementById('electronConfigCard');
   if(!is2D){ card.style.display = 'none'; return; }
-  card.style.display = 'grid';
+  card.style.display = 'block';
   document.getElementById('shellConfigValue').textContent = getShellDistribution(electrons).join(', ') || '—';
   document.getElementById('orbitalConfigValue').textContent = getOrbitalConfig(electrons);
 }
+
+// Collapsible header — expanded by default, mainly useful on small screens
+const ecToggleBtn = document.getElementById('ecToggleBtn');
+ecToggleBtn.addEventListener('click', () => {
+  const card = document.getElementById('electronConfigCard');
+  const nowCollapsed = card.classList.toggle('collapsed');
+  ecToggleBtn.setAttribute('aria-expanded', String(!nowCollapsed));
+});
 
 // ---------------------------------------------------------------
 // State
