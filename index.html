@@ -88,6 +88,17 @@
   .info-value.unstable{ color:var(--unstable); }
   .info-value.radioactive{ color:var(--radioactive); }
 
+  .electron-config-card{
+    display:grid; grid-template-columns:1fr 1fr; gap:1px;
+    background:var(--border); border:1px solid var(--border); border-radius:12px;
+    overflow:hidden; margin-top:14px;
+  }
+  .ec-col{ background:var(--panel); padding:14px 16px; }
+  .ec-value{ font-family:var(--font-data); font-size:14px; letter-spacing:0.01em; line-height:1.65; word-break:break-word; }
+  @media (max-width:560px){
+    .electron-config-card{ grid-template-columns:1fr; }
+  }
+
   .controls{ margin-top:22px; display:flex; flex-direction:column; gap:16px; }
   .control-row{ display:grid; grid-template-columns:88px 1fr 56px; align-items:center; gap:14px; }
   .control-row label{ font-size:13px; color:var(--text); }
@@ -125,11 +136,23 @@
   <div class="stage" id="stage">
     <canvas id="canvas"></canvas>
     <button class="resetBtn" id="resetCam" title="Reset view" aria-label="Reset view">⟲</button>
-    <div class="hint">drag to orbit · scroll to zoom</div>
+    <button class="resetBtn" id="toggleView" title="Switch to 2D diagram view" aria-label="Toggle 2D/3D view" style="right:54px; font-size:11px; font-family:var(--font-data);">3D</button>
+    <div class="hint" id="stageHint">drag to orbit · scroll to zoom</div>
     <div class="legend">
       <span><i class="dot p"></i>Proton</span>
       <span><i class="dot n"></i>Neutron</span>
       <span><i class="dot e"></i>Electron</span>
+    </div>
+  </div>
+
+  <div class="electron-config-card" id="electronConfigCard" style="display:none;">
+    <div class="ec-col">
+      <div class="info-label">Shell Configuration</div>
+      <div class="ec-value" id="shellConfigValue">—</div>
+    </div>
+    <div class="ec-col">
+      <div class="info-label">Orbital Configuration</div>
+      <div class="ec-value" id="orbitalConfigValue">—</div>
     </div>
   </div>
 
@@ -207,10 +230,53 @@ function defaultNeutrons(z){
   return Math.max(0, Math.round(w) - z);
 }
 
+// Bohr shell distribution, e.g. 11 electrons -> [2, 8, 1]
+function getShellDistribution(e){
+  let remaining = e, i = 0;
+  const dist = [];
+  while(remaining > 0 && i < SHELL_CAPACITY.length){
+    const n = Math.min(SHELL_CAPACITY[i], remaining);
+    dist.push(n);
+    remaining -= n;
+    i++;
+  }
+  return dist;
+}
+
+// Quantum-mechanical (Aufbau) orbital configuration, e.g. 11 -> "1s² 2s² 2p⁶ 3s¹"
+const AUFBAU_ORDER = [
+  ['1s',2],['2s',2],['2p',6],['3s',2],['3p',6],['4s',2],['3d',10],['4p',6],
+  ['5s',2],['4d',10],['5p',6],['6s',2],['4f',14],['5d',10],['6p',6],
+  ['7s',2],['5f',14],['6d',10],['7p',6]
+];
+const SUPERSCRIPT_DIGITS = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+function toSuperscript(n){ return String(n).split('').map(d => SUPERSCRIPT_DIGITS[d]).join(''); }
+
+function getOrbitalConfig(e){
+  let remaining = e;
+  const parts = [];
+  for(const [label, cap] of AUFBAU_ORDER){
+    if(remaining <= 0) break;
+    const n = Math.min(cap, remaining);
+    parts.push(label + toSuperscript(n));
+    remaining -= n;
+  }
+  return parts.length ? parts.join(' ') : '—';
+}
+
+function updateElectronConfigCard(){
+  const card = document.getElementById('electronConfigCard');
+  if(!is2D){ card.style.display = 'none'; return; }
+  card.style.display = 'grid';
+  document.getElementById('shellConfigValue').textContent = getShellDistribution(electrons).join(', ') || '—';
+  document.getElementById('orbitalConfigValue').textContent = getOrbitalConfig(electrons);
+}
+
 // ---------------------------------------------------------------
 // State
 // ---------------------------------------------------------------
 let protons = 6, neutrons = 6, electrons = 6;
+let is2D = false;
 
 // ---------------------------------------------------------------
 // UI wiring
@@ -274,6 +340,7 @@ function updateInfoCard(){
   }
   infoStability.textContent = stabilityText;
   infoStability.className = 'info-value ' + stabilityClass;
+  updateElectronConfigCard();
   return stabilityClass;
 }
 
@@ -391,8 +458,10 @@ canvas.addEventListener('pointermove', e => {
   if(activePointers.size === 1 && dragging) {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     lastX = e.clientX; lastY = e.clientY;
-    camState.theta -= dx * 0.006;
-    camState.phi = Math.min(Math.PI-0.15, Math.max(0.15, camState.phi - dy * 0.006));
+    if(!is2D){
+      camState.theta -= dx * 0.006;
+      camState.phi = Math.min(Math.PI-0.15, Math.max(0.15, camState.phi - dy * 0.006));
+    }
   } else if(activePointers.size === 2) {
     const pts = Array.from(activePointers.values());
     const currentDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
@@ -428,9 +497,29 @@ canvas.addEventListener('wheel', e => {
 document.getElementById('resetCam').addEventListener('click', () => {
   camState.radius = DEFAULT_CAM.radius;
   camState.targetRadius = DEFAULT_CAM.radius;
-  camState.theta = DEFAULT_CAM.theta;
-  camState.phi = DEFAULT_CAM.phi;
+  camState.theta = is2D ? FLAT_CAM.theta : DEFAULT_CAM.theta;
+  camState.phi = is2D ? FLAT_CAM.phi : DEFAULT_CAM.phi;
 });
+
+// --- 2D / 3D view toggle ---
+const toggleViewBtn = document.getElementById('toggleView');
+const stageHint = document.getElementById('stageHint');
+const FLAT_CAM = { theta:0, phi:Math.PI/2 };
+
+function setViewMode(next2D){
+  is2D = next2D;
+  toggleViewBtn.textContent = is2D ? '2D' : '3D';
+  toggleViewBtn.title = is2D ? 'Switch to 3D model view' : 'Switch to 2D diagram view';
+  stageHint.textContent = is2D ? 'scroll to zoom · flat diagram view' : 'drag to orbit · scroll to zoom';
+  if(is2D){
+    camState.theta = FLAT_CAM.theta;
+    camState.phi = FLAT_CAM.phi;
+  }
+  rebuildElectrons(); // shells/electrons are laid out differently in each mode
+  updateElectronConfigCard();
+}
+
+toggleViewBtn.addEventListener('click', () => setViewMode(!is2D));
 
 // --- Nucleus ---
 const protonMat = new THREE.MeshStandardMaterial({ color:0xFF5D5D, emissive:0x001133, roughness:0.35, metalness:0.1 });
@@ -530,20 +619,24 @@ function rebuildNucleus(){
 const electronGeo = new THREE.SphereGeometry(0.1, 32, 32);
 const electronMat = new THREE.MeshStandardMaterial({ color:0x4CC9F0, emissive:0x3a0a0a, roughness:0.2, metalness:0.2 });
 const shellRingMat = new THREE.LineBasicMaterial({ color:0x2a3342, transparent:true, opacity:0.5 });
+const shellRingMatFlat = new THREE.LineBasicMaterial({ color:0x3d4a5e, transparent:true, opacity:0.85 });
 let electronMeshes = []; // {mesh, base:Vector3, axis:Vector3, speed, phase}
 let shellRings = [];
 
 function shellRadius(n){ return nucleusRadius + 1.15 + (n-1) * 0.88; }
 
-function buildShellRing(radius){
+function buildShellRing(radius, flat){
   const pts = [];
   const segs = 96;
   for(let i=0;i<=segs;i++){
     const a = (i/segs) * Math.PI * 2;
-    pts.push(new THREE.Vector3(radius*Math.cos(a), 0, radius*Math.sin(a)));
+    pts.push(flat
+      ? new THREE.Vector3(radius*Math.cos(a), radius*Math.sin(a), 0)
+      : new THREE.Vector3(radius*Math.cos(a), 0, radius*Math.sin(a))
+    );
   }
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  return new THREE.Line(geo, shellRingMat);
+  return new THREE.Line(geo, flat ? shellRingMatFlat : shellRingMat);
 }
 
 function rebuildElectrons(){
@@ -561,26 +654,38 @@ function rebuildElectrons(){
     const countInShell = Math.min(cap, remaining);
     const rad = shellRadius(shellIndex+1);
 
-    // const ring = buildShellRing(rad);
-    // ring.rotation.x = (shellIndex % 2) * 0.35;
-    // ring.rotation.z = (shellIndex % 3) * 0.4;
-    // scene.add(ring);
-    // shellRings.push(ring);
+    // Shell lines only appear in the flat 2D diagram view
+    if(is2D){
+      const ring = buildShellRing(rad, true);
+      scene.add(ring);
+      shellRings.push(ring);
+    }
 
     for(let i=0;i<countInShell;i++){
-      const y = countInShell > 1 ? 1 - (i/(countInShell-1))*2 : 0;
-      const rY = Math.sqrt(Math.max(0,1-y*y));
-      const theta = goldenAngle * i;
-      const base = new THREE.Vector3(Math.cos(theta)*rY, y, Math.sin(theta)*rY).multiplyScalar(rad);
-      const axis = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
       const mesh = new THREE.Mesh(electronGeo, electronMat);
-      mesh.position.copy(base);
       scene.add(mesh);
-      electronMeshes.push({
-        mesh, base, axis,
-        speed: 0.35 + 0.5/(shellIndex+1),
-        phase: Math.random()*Math.PI*2
-      });
+
+      if(is2D){
+        // Evenly spaced around a flat circle, like a classic Bohr diagram
+        const flatAngle0 = (i / countInShell) * Math.PI * 2;
+        mesh.position.set(rad*Math.cos(flatAngle0), rad*Math.sin(flatAngle0), 0);
+        electronMeshes.push({
+          mesh, flat:true, flatRadius: rad, flatAngle0,
+          speed: 0.35 + 0.5/(shellIndex+1)
+        });
+      } else {
+        const y = countInShell > 1 ? 1 - (i/(countInShell-1))*2 : 0;
+        const rY = Math.sqrt(Math.max(0,1-y*y));
+        const theta = goldenAngle * i;
+        const base = new THREE.Vector3(Math.cos(theta)*rY, y, Math.sin(theta)*rY).multiplyScalar(rad);
+        const axis = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
+        mesh.position.copy(base);
+        electronMeshes.push({
+          mesh, flat:false, base, axis,
+          speed: 0.35 + 0.5/(shellIndex+1),
+          phase: Math.random()*Math.PI*2
+        });
+      }
     }
     remaining -= countInShell;
     shellIndex++;
@@ -620,15 +725,20 @@ function animate(){
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
 
-  if(!dragging && !REDUCED_MOTION){ camState.theta += 0.0016; }
+  if(!dragging && !REDUCED_MOTION && !is2D){ camState.theta += 0.0016; }
   camState.radius += (camState.targetRadius - camState.radius) * 0.12;
   applyCamera();
 
   if(!REDUCED_MOTION){
     electronMeshes.forEach(o => {
-      q.setFromAxisAngle(o.axis, t * o.speed + o.phase);
-      const p = o.base.clone().applyQuaternion(q);
-      o.mesh.position.copy(p);
+      if(o.flat){
+        const a = o.flatAngle0 + t * o.speed;
+        o.mesh.position.set(o.flatRadius*Math.cos(a), o.flatRadius*Math.sin(a), 0);
+      } else {
+        q.setFromAxisAngle(o.axis, t * o.speed + o.phase);
+        const p = o.base.clone().applyQuaternion(q);
+        o.mesh.position.copy(p);
+      }
     });
     const pulse = 0.5 + 0.5*Math.sin(t*1.6);
     protonMat.emissiveIntensity = 0.6 + pulse*0.4;
