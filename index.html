@@ -283,17 +283,35 @@ function syncReadouts(){
   electronSlider.value = electrons; electronReadout.textContent = electrons;
 }
 
-function onProtonsChanged(newZ){
+// Calculates the outermost active shell and backs the camera up to fit it
+function autoZoomCamera() {
+  let remaining = electrons;
+  let s = 0;
+  while (remaining > 0 && s < SHELL_CAPACITY.length) {
+    remaining -= SHELL_CAPACITY[s];
+    s++;
+  }
+  // If no electrons, frame the nucleus. Otherwise, frame the outermost shell.
+  const maxRad = s > 0 ? shellRadius(s) : (nucleusRadius + 0.5);
+  
+  // Multiply by 2.4 to account for the camera's 45-degree field of view, plus a little padding
+  camState.targetRadius = Math.min(35, maxRad * 2.4 + 1.5); 
+}
+
+function onProtonsChanged(newZ, autoZoom = false){
   protons = newZ;
   neutrons = defaultNeutrons(protons);
   electrons = protons;
   jumpSelect.value = protons;
   syncReadouts();
   rebuildAtom();
+  if (autoZoom) autoZoomCamera();
 }
 
-protonSlider.addEventListener('input', e => onProtonsChanged(parseInt(e.target.value,10)));
-jumpSelect.addEventListener('change', e => onProtonsChanged(parseInt(e.target.value,10)));
+// Dropdown: Enables autoZoom
+jumpSelect.addEventListener('change', e => onProtonsChanged(parseInt(e.target.value, 10), true));
+// Slider: Keeps autoZoom false
+protonSlider.addEventListener('input', e => onProtonsChanged(parseInt(e.target.value, 10), false));
 neutronSlider.addEventListener('input', e => {
   neutrons = parseInt(e.target.value,10);
   neutronReadout.textContent = neutrons;
@@ -380,7 +398,7 @@ canvas.addEventListener('pointermove', e => {
     const currentDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
     if(initialPinchDist > 0) {
       const delta = initialPinchDist - currentDist;
-      camState.targetRadius = Math.min(20, Math.max(3, camState.targetRadius + delta * 0.05));
+      camState.targetRadius = Math.min(35, Math.max(3, camState.targetRadius + delta * 0.05));
       initialPinchDist = currentDist; 
     }
   }
@@ -404,7 +422,7 @@ canvas.addEventListener('pointerleave', onPointerUp);
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  camState.targetRadius = Math.min(20, Math.max(3, camState.targetRadius + e.deltaY * 0.01));
+  camState.targetRadius = Math.min(35, Math.max(3, camState.targetRadius + e.deltaY * 0.01));
 }, { passive:false });
 
 document.getElementById('resetCam').addEventListener('click', () => {
