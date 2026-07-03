@@ -120,6 +120,17 @@
     text-align:center; padding:6px 0; font-family:var(--font-data); font-size:13px;
   }
   .footnote{ margin-top:18px; font-size:11.5px; color:var(--muted); line-height:1.5; }
+  .electron-config-card { 
+    transition: all 0.3s ease; 
+  }
+  .ec-header { 
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel); padding: 14px 16px; border-bottom: 1px solid var(--border);
+  }
+  .ec-content { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
+  .collapsed .ec-content { display: none; }
+  .chevron { transition: transform 0.3s ease; display: inline-block; }
+  .collapsed .chevron { transform: rotate(-90deg); }
 </style>
 </head>
 <body>
@@ -146,13 +157,19 @@
   </div>
 
   <div class="electron-config-card" id="electronConfigCard" style="display:none;">
-    <div class="ec-col">
-      <div class="info-label">Shell Configuration</div>
-      <div class="ec-value" id="shellConfigValue">—</div>
+    <div class="ec-header" onclick="toggleConfig()">
+      <div class="info-label" style="margin-bottom:0">Electron Configuration</div>
+      <span class="chevron">▼</span>
     </div>
-    <div class="ec-col">
-      <div class="info-label">Orbital Configuration</div>
-      <div class="ec-value" id="orbitalConfigValue">—</div>
+    <div class="ec-content">
+      <div class="ec-col">
+        <div class="info-label">Shell</div>
+        <div class="ec-value" id="shellConfigValue">—</div>
+      </div>
+      <div class="ec-col">
+        <div class="info-label">Orbital</div>
+        <div class="ec-value" id="orbitalConfigValue">—</div>
+      </div>
     </div>
   </div>
 
